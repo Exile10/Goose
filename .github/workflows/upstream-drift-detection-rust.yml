@@ -1,12 +1,10 @@
 name: Upstream Drift Detection
 
 on:
-  push:
+  schedule:
+    # Every Monday at 9 AM UTC
+    - cron: "0 9 * * 1"
   workflow_dispatch:
-  # schedule:
-  #   # Every Monday at 9 AM UTC
-  #   - cron: "0 9 * * 1"
-  # workflow_dispatch:
 
 permissions:
   contents: read
