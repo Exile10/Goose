@@ -2,8 +2,7 @@ name: Upstream Drift Detection
 
 on:
   schedule:
-    # Run every Monday at 9 AM UTC
-    - cron: '0 9 * * 1'
+    - cron: "0 9 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -35,40 +34,32 @@ jobs:
       - name: Calculate drift metrics
         id: drift
         run: |
-          # Count commits
           AHEAD=$(git rev-list --count upstream/main..HEAD 2>/dev/null || echo "0")
           BEHIND=$(git rev-list --count HEAD..upstream/main 2>/dev/null || echo "0")
-          
-          # Store outputs
+
           echo "ahead=${AHEAD}" >> "$GITHUB_OUTPUT"
           echo "behind=${BEHIND}" >> "$GITHUB_OUTPUT"
-          
-          # Build summary
+
           {
-            echo "## 📊 Upstream Drift Detection Report"
+            echo "## Upstream Drift Detection Report"
             echo ""
             echo "**Repository**: Exile10/Goose"
             echo "**Upstream**: block/goose"
-            echo "**Report Date**: $(date -u +'%Y-%m-%d %H:%M UTC')"
             echo ""
             echo "### Drift Metrics"
-            echo "- **Commits ahead**: $AHEAD"
-            echo "- **Commits behind**: $BEHIND"
+            echo "- Commits ahead: $AHEAD"
+            echo "- Commits behind: $BEHIND"
             echo ""
             
             if [ "$BEHIND" -gt 5 ]; then
-              echo "### ⚠️ Status: BEHIND UPSTREAM"
-              echo ""
-              echo "Your fork is **$BEHIND commits behind** block/goose/main."
-              echo "Consider syncing to prevent merge conflicts."
+              echo "### Status: BEHIND UPSTREAM"
+              echo "Your fork is $BEHIND commits behind. Consider syncing."
             elif [ "$BEHIND" -eq 0 ]; then
-              echo "### ✅ Status: IN SYNC"
-              echo ""
-              echo "Your fork is perfectly synchronized with block/goose/main."
+              echo "### Status: IN SYNC"
+              echo "Your fork is synchronized with upstream."
             else
-              echo "### ✅ Status: MINOR DRIFT"
-              echo ""
-              echo "Your fork is only **$BEHIND commits behind** block/goose/main."
+              echo "### Status: MINOR DRIFT"
+              echo "Your fork is only $BEHIND commits behind."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -81,9 +72,9 @@ jobs:
             echo ""
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          
-          git log --oneline upstream/main..HEAD --max-count=20 >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "(no commits ahead)" >> "$GITHUB_STEP_SUMMARY"
-          
+
+          git log --oneline upstream/main..HEAD --max-count=20 >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "(none)" >> "$GITHUB_STEP_SUMMARY"
+
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Log commits behind
@@ -95,9 +86,9 @@ jobs:
             echo ""
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          
-          git log --oneline HEAD..upstream/main --max-count=20 >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "(no commits behind)" >> "$GITHUB_STEP_SUMMARY"
-          
+
+          git log --oneline HEAD..upstream/main --max-count=20 >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "(none)" >> "$GITHUB_STEP_SUMMARY"
+
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create issue if significantly behind
@@ -107,53 +98,25 @@ jobs:
           script: |
             const behind = parseInt('${{ steps.drift.outputs.behind }}', 10);
             const ahead = parseInt('${{ steps.drift.outputs.ahead }}', 10);
-            
-            // Check if issue already exists
-            const { data: existingIssues } = await github.rest.issues.listForRepo({
+
+            const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
               labels: ['upstream-sync']
             });
-            
-            // Only create if no issue exists
-            if (existingIssues.length === 0) {
+
+            if (issues.length === 0) {
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                title: `📊 Upstream Sync Needed: ${behind} commits behind`,
-                body: `## Upstream Drift Alert
-
-Your Exile10/Goose fork is **${behind} commits behind** and **${ahead} commits ahead** of block/goose/main.
-
-### Action Required
-Sync with upstream to prevent merge conflicts.
-
-### How to Sync
-
-**Option 1: Git Commands**
-\`\`\`bash
-git fetch upstream main
-git merge upstream/main
-git push origin main
-\`\`\`
-
-**Option 2: GitHub UI**
-Visit your repository and click "Sync fork" → "Update branch"
-
-**Option 3: Rebase**
-\`\`\`bash
-git fetch upstream main
-git rebase upstream/main
-git push origin main --force-with-lease
-\`\`\`
-
-This issue will be closed when drift is resolved.`,
+                title: `Upstream Sync Needed: ${behind} commits behind`,
+                body: `Your fork is ${behind} commits behind block/goose/main.\n\nSync with upstream to prevent merge conflicts.\n\nGit commands:\n\`\`\`bash\ngit fetch upstream main\ngit merge upstream/main\ngit push origin main\n\`\`\``,
                 labels: ['maintenance', 'upstream-sync']
               });
-              console.log(`Created upstream sync issue`);
+              console.log('Created upstream sync issue');
             } else {
-              console.log(`Upstream sync issue already exists`);
+              console.log('Upstream sync issue already exists');
             }
 
       - name: Close sync issue if in sync
@@ -167,7 +130,7 @@ This issue will be closed when drift is resolved.`,
               state: 'open',
               labels: ['upstream-sync']
             });
-            
+
             for (const issue of issues) {
               await github.rest.issues.update({
                 owner: context.repo.owner,
@@ -177,3 +140,4 @@ This issue will be closed when drift is resolved.`,
               });
               console.log(`Closed issue #${issue.number}`);
             }
+
